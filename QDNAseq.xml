@@ -1,0 +1,379 @@
+<tool id="QDNAseq" name="QDNAseq" version="1.0.0" force_history_refresh="True">
+  
+  <requirements>
+    
+    <requirement type="package" version="0.1.18">samtools</requirement>
+    <!-- R 3.1.0 dependency will be used instead when available, now default R is used, see command -->
+    <!-- <requirement type="package" version="3.1.0">R</requirement> -->
+    <!-- <requirement type="package" version="1.2.2">qdnaseq</requirement> -->
+    <requirement type="set_environment">QDNASEQ_PATH</requirement>
+    
+  </requirements>
+
+  <description>Quantitative copy number abberation detection</description>
+
+  <!-- change to /full/path/to/Rscript if required (eg /ccagc/lib/R/R-3.1.0/bin/Rscript) -->
+  <command interpreter="Rscript"> 
+    QDNAseq.R 
+    $qdnaseq_cfg
+    \$QDNASEQ_PATH
+  </command>
+
+  <version_command interpreter="Rscript">QDNAseq-version.R</version_command>
+
+  <stdio>
+    <!-- Anything higher than 0 means the R script didnt finish (correctly) -->
+    <!-- Because different R packages deal with err/warn differently unable to waterproof this -->
+    <exit_code range="1:" level="fatal" description="R script finished too early, check log" />
+  </stdio>
+  
+  <inputs>
+    
+    <!-- ==================== -->
+    <!-- General inputs -->
+    <!-- ==================== -->
+    
+    <!-- Job name: must contain non-whitespace chars -->
+    <param name="jobName" type="text" optional="false" label="Analysis/ouput name" help="Supply a name for the outputs to remind you what they contain" value="TEST">
+      <validator type="empty_field" />
+      <validator type="regex" message="No whitespace characters allowed">^[^\s\\]+$</validator>
+    </param>
+
+    <!-- Bin Size: only certain sizes are supported by QDNAseq package -->
+    <param name="binSizes" type="select" display="checkboxes" optional="false" multiple="true" label="Select bin-sizes to use (kb)" help="Larger bin sizes provide faster analysis but lower resolution. NOTE: BAM files are traversed again for each binsize, so selecting multiple bin-sizes takes extra analysis time!">
+      <option value="bin1000kb">1Mb</option>
+      <option value="bin100kb">100kb</option>
+      <option value="bin30kb">30kb</option>
+      <option value="bin15kb" selected="true">15kb</option>
+      <option value="bin5kb">5kb</option>
+      <option value="bin1kb">1kb</option>
+    </param>
+
+    <!-- Experiment type: only one type (SR50) supported now, maybe more in the future-->
+    <param name="experimentType" type="select" label="Type of sequencing data" help="Currently only single end reads of lenght 50 are supported within galaxy">
+      <option value="SR50">Single Reads of 50bp</option>
+      <!-- <option value="PE1000">PairedEnd1000</option> -->
+    </param>
+
+    <!-- ==================== -->
+    <!-- Input BAMs -->
+    <!-- ==================== -->
+    <param name="bams" type="data" multiple="true" optional="True" format="bam" label="Input BAMs" help="Select the BAM files to analyze" />
+
+    <!-- ==================== -->
+    <!-- Optional segmenting step -->
+    <!-- ==================== -->
+    <param name="doSegment" type="select" label="Also perform segmentation" help="Segmentation collects bins with similar ratio into regions">
+      <option value="FALSE">no</option>
+      <option value="TRUE">yes</option>
+    </param>
+
+    <!-- ==================== -->
+    <!-- Optional calling step -->
+    <!-- ==================== -->
+    <param name="doCall" type="select" label="Also perform calling" help="Calling tries to determine a state for each segment (GAIN, LOSS, etc)">
+      <option value="FALSE">no</option>
+      <option value="TRUE">yes</option>
+    </param>
+
+    <!-- ==================== -->
+    <!-- Optional hisotry output: copynumber TXT file -->
+    <!-- ==================== -->
+    <param name="txt2history" type="select" label="Also output copynumber TXT file to history">
+      <option value="FALSE">no</option>
+      <option value="TRUE">yes</option>
+    </param>
+
+    <!-- ==================== -->
+    <!-- Optional history output: R object RDS file -->
+    <!-- ==================== -->
+    <param name="rds2history" type="select" label="Also output copynumber RDS files to history">
+      <option value="FALSE">no</option>
+      <option value="TRUE">yes</option>
+    </param>
+
+    <!-- ==================== -->
+    <!-- Option to use your own bin annotations file -->
+    <!-- ==================== -->
+    <!-- NOT IN USE YET -->
+    <!--
+    <conditional name="binannotations_source">
+      <param name="show" type="select" label="Bin annotations to use" help="Default bin-annotations are for GRCh37/hg19 and tuned for 50bp reads (single end)">
+        <option value="default">Default</option>
+        <option value="history">From history</option>
+      </param>
+      <when value="history">
+        <param name="binannotation_file" type="data" multiple="false" label="R data structure file (*.rds) with bin-annotations" help="If you made your own bin-annotations with the QDNAseq bioconductor package you can upload them to your history and select here" />
+      </when>
+      <when value="default">
+        <param name="binannotation_file" type="hidden" value="" />
+      </when>
+      
+    </conditional> 
+    -->
+
+    <!-- ==================== -->
+    <!-- Optional advanced options -->
+    <!-- ==================== -->
+    <conditional name="advanced">
+      <param name="show" type="select" label="Use advanced options" help="Select yes to show and use filter and output options">
+        <option value="no">no</option>
+        <option value="yes">yes</option>
+      </param>
+      <when value="yes">
+
+        <param name="undo_splits" type="select" label="undoSplits" help="If set to sdundo, see undoSD below">
+          <option value="sdundo">sdundo</option>
+          <option value="prune">prune</option>
+          <option value="none">none</option>
+        </param>
+
+        <param name="undoSD" size="10" type="float" value="1" label="undoSD" help='The number of SDs between means to keep a split if undo.splits="sdundo".' />
+          
+        <param name="blacklist" type="select" label="Filter blacklisted bins (blacklist)" help="Will exclude all blacklisted bins in the binannotation if set">
+          <option value="TRUE">yes</option>
+          <option value="FALSE">no</option>
+        </param>
+
+        <param name="mappability" type="integer" value="0" min="0" max="100" label="Filter bins with lower mappability" help="Will exclude all bins will lower mappability than this number (0-100)" />
+      
+        <!-- ==================== -->
+        <!-- Optional graphical/plotting options -->
+        <!-- ==================== -->
+        <param name="plot_width" size="3" type="integer" value="1440" label="Width of the png image produced" />
+        <param name="plot_height" size="3" type="integer" value="720" label="Height of the png image produced" />
+        <param name="exclude_chrs" type="select" multiple="true" label="Hide these chromosomes in plots" help="Currently only standard human chromosomes supported. NOTE: other filters might also exclude chromosomes">
+          <option value="1">1</option><option value="2">2</option>
+          <option value="3">3</option><option value="4">4</option>
+          <option value="5">5</option><option value="6">6</option>
+          <option value="7">7</option><option value="8">8</option>
+          <option value="9">9</option><option value="10">10</option>
+          <option value="11">11</option><option value="12">12</option>
+          <option value="13">13</option><option value="14">14</option>
+          <option value="15">15</option><option value="16">16</option>
+          <option value="17">17</option><option value="18">18</option>
+          <option value="19">19</option><option value="20">20</option>
+          <option value="21">21</option><option value="22">22</option>
+          <option value="X" selected="true">X</option>
+          <option value="Y" selected="true">Y</option>
+        </param>
+      </when>
+
+      <!-- need to set defaults because params are passed to R regardless of conditional opened/closed -->
+      <when value="no">
+        <param name="undoSD" type="hidden" value="1" />
+        <param name="undo_splits" type="hidden" value="sdundo" />
+        <param name="blacklist" type="hidden" value="TRUE" />
+        <param name="mappability" type="hidden" value="0" />
+        <param name="plot_width" type="hidden" value="1440" />
+        <param name="plot_height" type="hidden" value="720" />
+        <param name="exclude_chrs" type="hidden" value="X,Y" />
+      </when>
+    </conditional>
+
+    <!-- ==================== -->
+    <!-- Option to perform a test run with built in data -->
+    <!-- ==================== -->
+    <param name="debug" type="select" label="Run with test data" help="Use inbuilt LGG150 data instead of input BAMs">
+      <option value="FALSE">no</option>
+      <option value="TRUE">yes</option>
+    </param>
+    
+  </inputs>
+  <!-- ==================== -->
+  <!-- Config file to pass params to R script -->
+  <!-- ==================== -->
+  <configfiles>
+    <configfile name="qdnaseq_cfg">
+## Desc: this file is sourced in QDNAseq R wrapper script
+##  as means to pass all galaxy params to R
+
+## -----
+## required params
+## -----
+TRUE -> inGalaxy 
+"${binSizes}" -> binSizesString
+"${experimentType}" -> experimentType
+"${jobName}" -> outputName
+
+## -----
+## extra main params
+## -----
+"${htmlFile}" -> outputHtml
+"${htmlFile.id}" -> outputId
+"${__new_file_path__}" -> newFilePath
+
+list() -> historyOutputFiles
+
+"${txt_1}" -> historyOutputFiles[[ 'txt_1' ]]
+"${txt_5}" -> historyOutputFiles[[ 'txt_5' ]]
+"${txt_15}" -> historyOutputFiles[[ 'txt_15' ]]
+"${txt_30}" -> historyOutputFiles[[ 'txt_30' ]]
+"${txt_100}" -> historyOutputFiles[[ 'txt_100' ]]
+"${txt_1000}" -> historyOutputFiles[[ 'txt_1000' ]]
+
+"${rds_1}" -> historyOutputFiles[[ 'rds_1' ]]
+"${rds_5}" -> historyOutputFiles[[ 'rds_5' ]]
+"${rds_15}" -> historyOutputFiles[[ 'rds_15' ]]
+"${rds_30}" -> historyOutputFiles[[ 'rds_30' ]]
+"${rds_100}" -> historyOutputFiles[[ 'rds_100' ]]
+"${rds_1000}" -> historyOutputFiles[[ 'rds_1000' ]]
+
+
+"${htmlFile.files_path}" -> outputPath
+as.logical( "${doSegment}" ) -> doSegment
+as.logical( "${doCall}" ) -> doCall
+as.logical( "${debug}" ) -> debug
+
+## -----
+## own bin-annotations file options
+## -----
+<!-- 
+"${binannotations_source.binannotation_file}" -> binAnnotations
+-->
+
+## -----
+## advanced options
+## -----
+as.double( "${advanced.undoSD}" ) -> undoSD
+as.logical( "${advanced.blacklist}" ) -> filterBlacklistedBins
+as.integer( "${advanced.mappability}" ) -> mappabilityCutoff
+"${advanced.undo_splits}" -> undoSplits
+as.logical( "${txt2history}" ) -> txt2history
+as.logical( "${rds2history}" ) -> rds2history
+
+## -----
+## plot options
+## -----
+as.integer( "${advanced.plot_width}" ) -> PLOT_WIDTH
+as.integer( "${advanced.plot_height}" ) -> PLOT_HEIGHT
+"${advanced.exclude_chrs}" -> excludeChrsString
+  
+## -----
+## input BAMs init
+## -----
+c() -> bamsPaths
+c() -> bamsNames
+
+#for bam in $bams# 
+c( bamsPaths, "${bam}" ) -> bamsPaths
+c( bamsNames, "${bam.name}" ) -> bamsNames
+#end for
+
+    </configfile>
+  </configfiles>
+
+  <!-- ==================== -->
+  <!-- Main output is an html based report -->
+  <!-- ==================== -->
+  <outputs>
+
+    <!-- main output is a html report -->
+    <!-- ...but there can be more outputs using the id of the htmlFile output -->
+    
+    <data format="html" name="htmlFile" label="QDNAseq: ${jobName} report" />
+
+    <!-- WHY does there seem to be no way to use split() within this code in galaxy!!! -->
+    <!-- now have to fall back to using unique names within binSizes instead of just integers -->
+    <!-- Problem with integers is that both "1" and "5" are also present in eg "15,100" -->
+    <data format="tabular" name="txt_1000" label="QDNAseq: ${jobName} txt 1000kb">
+      <filter>( "bin1000kb" in binSizes and txt2history == 'TRUE')</filter>
+    </data>
+    <data format="tabular" name="txt_100" label="QDNAseq: ${jobName} txt 100kb">
+      <filter>("bin100kb" in binSizes and txt2history == 'TRUE')</filter>
+    </data>
+    <data format="tabular" name="txt_30" label="QDNAseq: ${jobName} txt 30kb">
+      <filter>("bin30kb" in binSizes and txt2history == 'TRUE')</filter>
+    </data>
+    <data format="tabular" name="txt_15" label="QDNAseq: ${jobName} txt 15kb">
+      <filter>("bin15kb" in binSizes and txt2history == 'TRUE')</filter>
+    </data>
+    <data format="tabular" name="txt_5" label="QDNAseq: ${jobName} txt 5kb">
+      <filter>("bin5kb" in binSizes and txt2history == 'TRUE')</filter>
+    </data>
+    <data format="tabular" name="txt_1" label="QDNAseq: ${jobName} txt 1kb">
+      <filter>("bin1kb" in binSizes and txt2history == 'TRUE')</filter>
+    </data>
+
+    <data format="rds" name="rds_1000" label="QDNAseq: ${jobName} rds 1000kb">
+      <filter>( "bin1000kb" in binSizes and rds2history == 'TRUE')</filter>
+    </data>
+    <data format="rds" name="rds_100" label="QDNAseq: ${jobName} rds 100kb">
+      <filter>( "bin100kb" in binSizes and rds2history == 'TRUE')</filter>
+    </data>
+    <data format="rds" name="rds_30" label="QDNAseq: ${jobName} rds 30kb">
+      <filter>( "bin30kb" in binSizes and rds2history == 'TRUE')</filter>
+    </data>
+    <data format="rds" name="rds_15" label="QDNAseq: ${jobName} rds 15kb">
+      <filter>( "bin15kb" in binSizes and rds2history == 'TRUE')</filter>
+    </data>
+    <data format="rds" name="rds_5" label="QDNAseq: ${jobName} rds 5kb">
+      <filter>( "bin5kb" in binSizes and rds2history == 'TRUE')</filter>
+    </data>
+    <data format="rds" name="rds_1" label="QDNAseq: ${jobName} rds 1kb">
+      <filter>( "bin1kb" in binSizes and rds2history == 'TRUE')</filter>
+    </data>
+
+  </outputs>
+
+  <!-- ==================== -->
+  <!-- Tests still to be done -->
+  <!-- ==================== -->
+
+  <!-- 
+  <tests>
+    <test>
+      <param name="input1" value="input1" />   
+      <param name="input2" value="input2" />   
+    </test>
+  </tests>
+  -->
+
+  <help>
+.. class:: infomark
+
+**Introduction**
+
+This tool is a wrapper for the R Bioconductor package QDNAseq_
+
+.. _QDNAseq: http://www.bioconductor.org/packages/release/bioc/html/QDNAseq.html
+
+It determines the copy number state of human chromosomes 1 - 22 for (shallow coverage) whole genome sequencing data.
+
+For questions/remarks about the galaxy part of this tool, see contact form here_
+
+.. _here: http://www.stefs.nl/wp/contact
+
+You can **test this tool** with built-in data by selecting the option "Run with test data" and press execute.
+
+-----
+
+.. class:: warningmark
+
+As there is no R 3.1.0 galaxy-package yet (a requirement for QDNAseq), the **dependencies** need to be installed by hand and available to the user under which galaxy runs: R (3.1.0) and bioconductor package QDNAseq (>= 1.0.5). In case the default R is not 3.1.0, also the wrapper xml must be updated to include the correct path during installation of this tool.
+
+.. class:: warningmark
+
+The input BAMs are expected to be **single end reads of 50bp length** mapped to GRCh37/hg19 genome build. Other experiment setups are currently not tested or supported within galaxy. See the documentation of QDNAseq at bioconductor on how to deal with different setups (or keep fingers crossed ;) )
+
+.. class:: warningmark
+
+Some optional history input/output files are of format "rds" (file format to store a R object). This is not registered in galaxy by default, so has to be added to the available datatypes.
+
+-----
+
+**Citation**
+
+For the underlying QDNAseq R package please cite: 
+Scheinin I, Sie D, Bengtsson H, van de Wiel MA, Olshen AB, van Thuijl HF, van Essen HF, Eijk PP, Rustenburg F, Meijer GA, Reijneveld JC, Wesseling P, Pinkel D, Albertson DG and Ylstra B (2014). “DNA copy number analysis of fresh and formalin-fixed specimens by shallow whole-genome sequencing with identification and exclusion of problematic regions in the genome assembly.” Genome Research. doi:10.1101/gr.175141.114.
+
+See also the bioconductor package_ documentation.
+
+.. _package: http://www.bioconductor.org/packages/release/bioc/html/QDNAseq.html
+
+.. image:: LGG150_copynumber.png
+.. image:: LGG150_copynumberSegmented.png
+
+  </help>
+
+</tool>

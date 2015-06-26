@@ -1,0 +1,211 @@
+<tool id="QDNAseq-plot" name="QDNAseq-plot" version="0.0.1" force_history_refresh="True">
+  
+  <requirements>
+    
+    <!-- R 3.1.0 dependency will be used instead when available, now default R is used, see command -->
+    <!-- <requirement type="package" version="3.1.0">R</requirement> -->
+    <!-- <requirement type="package" version="1.2.2">qdnaseq</requirement> -->
+    
+  </requirements>
+
+  <description>Plot QDNAseq copy-number/segments/calls profile</description>
+
+  <!-- change to /full/path/to/Rscript if required (eg /ccagc/lib/R/R-3.1.0/bin/Rscript) -->
+  <command interpreter="Rscript"> 
+    QDNAseq-plot.R 
+    $cfg
+  </command>
+
+  <version_command interpreter="Rscript">QDNAseq-version.R</version_command>
+
+  <stdio>
+    <!-- Anything higher than 0 means the R script didnt finish (correctly) -->
+    <!-- Because different R packages deal with err/warn differently unable to waterproof this -->
+    <exit_code range="1:" level="fatal" description="R script finished too early, check log" />
+  </stdio>
+  
+  <inputs>
+    
+    <!-- ==================== -->
+    <!-- General inputs -->
+    <!-- ==================== -->
+    
+    <!-- Job name: must contain non-whitespace chars -->
+    <param name="jobName" type="text" optional="false" label="Analysis/ouput name" help="Supply a name for the outputs to remind you what they contain" value="TEST">
+      <!-- <validator type="empty_field" /> -->
+      <validator type="regex" message="No whitespace characters allowed">^[^\s\\]*$</validator>
+    </param>
+
+    <!-- ==================== -->
+    <!-- Input RDS -->
+    <!-- ==================== -->
+    <param name="rdsFile" type="data" optional="False" format="rds" label="Input RDS file (QDNAseq R object)" help="RDS file should contain a QDNAseq/CGHcall object. If segment and/or call values are present these are added to the plot." />
+
+    <!-- ==================== -->
+    <!-- One pdf with all samples or a png of one chosen sample -->
+    <!-- ==================== -->
+    <!--
+    <conditional name="all_or_one">
+      <param name="show" type="select" label="Plot all samples in RDS object or choose one" help="">
+        <option value="all">Plot all samples</option>
+        <option value="one">Choose which one</option>
+      </param>
+      <when value="one">
+        <param name="sample_nr" type="integer" required="True" value="1" label="sample-nr (integer)" help="" />
+      </when>
+      <when value="all">
+        <param name="plotAll" type="hidden" value="" />
+      </when>
+      
+    </conditional> 
+    -->
+    <param name="sample_index" type="integer" required="True" value="1" label="Sample-index (integer)" help="The RDS input object can contain data from multiple samples, this index tells the script which one to plot. Plotting multiple samples at the same time is not supported." />
+
+    <conditional name="subset_selection">
+      <param name="what_to_plot" type="select" label="What to plot" help="Instead of plotting everything in the object you can also select certain chromosomes or set a genomic region">
+        <option value="everything">Everything</option>
+        <option value="chromosomes">Selected chromosomes</option>
+        <option value="region">Genomic region</option>
+      </param>
+      <when value="everything">
+        <!-- ==================== -->
+        <param name="chr_name" type="hidden" value="NA" />
+        <param name="chr_start" type="hidden" value="NA" />
+        <param name="chr_end" type="hidden" value="NA" />
+        <param name="chromosomes" type="hidden" value="NA" />
+      </when>
+      <when value="chromosomes">
+        <!-- ==================== -->
+        <param name="chromosomes" type="select" multiple="true" optional="false" label="Select chromosomes to plot" help="To zoom in on a particular chromosome you can select one or more here">
+          <option value="1">1</option><option value="2">2</option>
+          <option value="3">3</option><option value="4">4</option>
+          <option value="5">5</option><option value="6">6</option>
+          <option value="7">7</option><option value="8">8</option>
+          <option value="9">9</option><option value="10">10</option>
+          <option value="11">11</option><option value="12">12</option>
+          <option value="13">13</option><option value="14">14</option>
+          <option value="15">15</option><option value="16">16</option>
+          <option value="17">17</option><option value="18">18</option>
+          <option value="19">19</option><option value="20">20</option>
+          <option value="21">21</option><option value="22">22</option>
+          <!--<option value="X" selected="true">X</option>-->
+          <!--<option value="Y" selected="true">Y</option>-->
+        </param>
+        <param name="chr_name" type="hidden" value="NA" />
+        <param name="chr_start" type="hidden" value="NA" />
+        <param name="chr_end" type="hidden" value="NA" />
+      </when>
+      <when value="region">
+        <!-- ==================== -->
+        <!--
+        <param name="genomic_region" type="text" optional="false" label="Genomic region" help="Supply a genomic region in format chr1:12345-23456" value="chr1:12345-23456" size="30">
+          <validator type="regex" message="No whitespace characters allowed">^[^\s\\]*$</validator>
+          <validator type="regex" message="String is not of correct format">^chr\d+\:\d+\-\d+$</validator>
+        </param>
+        -->
+        <param name="chr_name" size="2" type="integer" optional="false" value="" label="Chromosome" />
+        <param name="chr_start" size="15" type="integer" optional="false" value="" label="Start position on chromosome" />
+        <param name="chr_end" size="15" type="integer" optional="false" value="" label="End position on chromosome" />
+        <param name="chromosomes" type="hidden" value="NA" />
+      </when>
+
+    </conditional>
+
+    <!-- ==================== -->
+    <!-- Optional advanced options -->
+    <!-- ==================== -->
+    <conditional name="advanced">
+      <param name="show" type="select" label="Extra options" help="Select yes to show extra options">
+        <option value="no">no</option>
+        <option value="yes">yes</option>
+      </param>
+      <when value="yes">
+        <!-- ==================== -->
+        <!-- Optional graphical/plotting options -->
+        <!-- ==================== -->
+        <param name="plot_width" size="3" type="integer" value="1440" label="Width of the png image produced" />
+        <param name="plot_height" size="3" type="integer" value="720" label="Height of the png image produced" />
+      </when>
+
+      <!-- need to set defaults because params are passed to R regardless of conditional opened/closed -->
+      <when value="no">
+        <param name="plot_width" type="hidden" value="1440" />
+        <param name="plot_height" type="hidden" value="720" />
+      </when>
+    </conditional>
+    
+  </inputs>
+  <!-- ==================== -->
+  <!-- Config file to pass params to R script -->
+  <!-- ==================== -->
+  <configfiles>
+    <configfile name="cfg">
+## Desc: this file is sourced in QDNAseq-plot.R wrapper script
+##  as means to pass all galaxy params to R
+
+## -----
+## required params
+## -----
+"${jobName}" -> outputName
+"${outputPng}" -> outputPngPath
+"${rdsFile}" -> rdsFilePath
+as.integer( "${sample_index}" ) -> SAMPLE_INDEX
+"${subset_selection.what_to_plot}" -> whatToPlot
+"${subset_selection.chromosomes}" -> chromosomesToPlotString
+as.integer( "${subset_selection.chr_name}" ) -> chrName
+as.integer( "${subset_selection.chr_start}" ) -> chrStart
+as.integer( "${subset_selection.chr_end}" ) -> chrEnd
+
+## -----
+## extra options
+## -----
+as.integer( "${advanced.plot_width}" ) -> PLOT_WIDTH
+as.integer( "${advanced.plot_height}" ) -> PLOT_HEIGHT
+
+    </configfile>
+  </configfiles>
+
+  <!-- ==================== -->
+  <!-- One image as output -->
+  <!-- ==================== -->
+  <outputs>
+    <data format="png" name="outputPng" label="QDNAseq: ${jobName} PNG plot" />
+    <!--
+    <data format="png" name="outputPng" label="QDNAseq: ${jobName} PNG plot">
+      <filter>(all_or_one['show'] == 'one')</filter>
+    </data>
+    -->
+  </outputs>
+
+  <help>
+.. class:: infomark
+
+**Introduction**
+
+This tool is a wrapper for the plot function of the R Bioconductor package QDNAseq_
+
+.. _QDNAseq: http://www.bioconductor.org/packages/release/bioc/html/QDNAseq.html
+
+-----
+
+.. class:: warningmark
+
+As there is no R 3.1.0 galaxy-package yet (a requirement for QDNAseq), the **dependencies** need to be installed by hand and available to the user under which galaxy runs: R (3.1.0) and bioconductor package QDNAseq (>= 1.2.2). In case the default R is not 3.1.0, also the wrapper xml must be updated to include the correct path during installation of this tool.
+
+-----
+
+**Citation**
+
+For the underlying QDNAseq R package please cite: 
+Scheinin I, Sie D, Bengtsson H, van de Wiel MA, Olshen AB, van Thuijl HF, van Essen HF, Eijk PP, Rustenburg F, Meijer GA, Reijneveld JC, Wesseling P, Pinkel D, Albertson DG and Ylstra B (2014). “DNA copy number analysis of fresh and formalin-fixed specimens by shallow whole-genome sequencing with identification and exclusion of problematic regions in the genome assembly.” Genome Research. doi:10.1101/gr.175141.114.
+
+See also the bioconductor package_ documentation.
+
+.. _package: http://www.bioconductor.org/packages/release/bioc/html/QDNAseq.html
+
+.. image:: LGG150_copynumber.png
+.. image:: LGG150_copynumberSegmented.png
+
+  </help>
+
+</tool>

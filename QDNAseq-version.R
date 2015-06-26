@@ -1,0 +1,1 @@
+cat( packageDescription("QDNAseq", fields = "Version") )

@@ -1,0 +1,28 @@
+<?xml version="1.0"?>
+<tool_dependency>
+    
+    <package name="samtools" version="0.1.18">
+        <repository changeset_revision="c0f72bdba484" name="package_samtools_0_1_18" owner="devteam" prior_installation_required="TRUE" toolshed="https://testtoolshed.g2.bx.psu.edu" />
+    </package>
+
+    <!-- As soon as R 3_1_0 package works with all packages, all dependencies will be set via "package_qdnaseq_1_2_2" -->
+    <!-- Currently these have to be manually installed by installing Bioconductor package "QDNAseq" -->
+    
+    <!--
+    <package name="R" version="3.1.0">
+        <repository changeset_revision="a6cc7706ea14" name="package_r_3_1_0" owner="iuc" prior_installation_required="TRUE" />
+    </package>
+    -->
+
+    <!--
+    <package name="qdnaseq" version="1.2.2">
+        <repository name="package_qdnaseq_1_2_2" owner="stef" prior_installation_required="TRUE"/>
+    </package>
+    -->
+    
+    <set_environment version="1.0">
+        <environment_variable action="set_to" name="QDNASEQ_PATH">$REPOSITORY_INSTALL_DIR</environment_variable>
+    </set_environment>
+    
+    
+</tool_dependency>

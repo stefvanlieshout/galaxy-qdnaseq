@@ -1,0 +1,186 @@
+<tool id="QDNAseq-export" name="QDNAseq-export" version="0.0.1" force_history_refresh="True">
+  
+  <requirements>
+    
+    <!-- R 3.1.0 dependency will be used instead when available, now default R is used, see command -->
+    <!-- <requirement type="package" version="3.1.0">R</requirement> -->
+    <!-- <requirement type="package" version="1.2.2">qdnaseq</requirement> -->
+    
+  </requirements>
+
+  <description>Export QDNAseq data to tabular</description>
+
+  <!-- change to /full/path/to/Rscript if required (eg /ccagc/lib/R/R-3.1.0/bin/Rscript) -->
+  <command interpreter="Rscript"> 
+    QDNAseq-export.R 
+    $cfg
+  </command>
+
+  <version_command interpreter="Rscript">QDNAseq-version.R</version_command>
+
+  <stdio>
+    <!-- Anything higher than 0 means the R script didnt finish (correctly) -->
+    <!-- Because different R packages deal with err/warn differently unable to waterproof this -->
+    <exit_code range="1:" level="fatal" description="R script finished too early, check log" />
+  </stdio>
+  
+  <inputs>
+    
+    <!-- ==================== -->
+    <!-- General inputs -->
+    <!-- ==================== -->
+    
+    <!-- Job name: must contain non-whitespace chars -->
+    <param name="jobName" type="text" optional="false" label="Analysis/ouput name" help="Supply a name for the outputs to remind you what they contain" value="TEST">
+      <!-- <validator type="empty_field" /> -->
+      <validator type="regex" message="No whitespace characters allowed">^[^\s\\]*$</validator>
+    </param>
+
+    <!-- ==================== -->
+    <!-- Input RDS -->
+    <!-- ==================== -->
+    <param name="rdsFile" type="data" optional="False" format="rds" label="Input RDS file" help="RDS file should contain a QDNAseq R object (output of QDNAseq tool)" />
+
+    <!-- ==================== -->
+    <!-- Data level -->
+    <!-- ==================== -->
+    <param name="data_level" type="select" label="Level of data to export" help="If segmentation and/or calling has been performed the segmented or called values can be exported instead of copynumber (normalized read counts)">
+      <option value="copynumber">copynumbers</option>
+      <option value="segments">segments</option>
+      <option value="calls">calls</option>
+    </param>
+
+    <!-- ==================== -->
+    <!-- Include filtered bins or not -->
+    <!-- ==================== -->
+    <param name="filter_bins" type="select" label="Also output copynumber RDS files to history" help="Each bin has a filter status. By default the bins that were previously ignored by the analysis before are not send to the output. Set to 'include' if you want to include those as well">
+      <option value="TRUE">Exclude filtered bins</option>
+      <option value="FALSE">Include filtered bins</option>
+    </param>    	
+
+    <!-- ==================== -->
+    <!-- Output type -->
+    <!-- ==================== -->
+    <conditional name="output_format_selection">
+      <param name="output_format" type="select" label="Plot all samples in RDS object or choose one" help="All output is tabular, but depending on downstream use some formats are more handy than others">
+        <option value="tsv">TSV</option>
+        <option value="igv">IGV</option>
+        <option value="bed">BED</option>
+      </param>
+      <when value="bed">
+        <param name="sample_index" type="integer" required="True" value="1" label="sample-index (integer)" help="The object can host muliple samples while the BED option can only export one. Therefor a sample index must be chosen for this output." />
+      </when>
+      <when value="tsv">
+        <param name="sample_index" type="hidden" value="" />
+      </when>
+      <when value="igv">
+        <param name="sample_index" type="hidden" value="" />
+      </when>
+      
+    </conditional> 
+    
+  </inputs>
+
+  <!-- ==================== -->
+  <!-- Config file to pass params to R script -->
+  <!-- ==================== -->
+  <configfiles>
+    <configfile name="cfg">
+## Desc: this file is sourced in QDNAseq-export.R wrapper script
+##  as means to pass all galaxy params to R
+
+"${jobName}" -> outputName
+"${output_file}" -> outputFile
+"${data_level}" -> dataLevel
+"${output_format_selection.output_format}" -> outputFormat
+"${rdsFile}" -> rdsFilePath
+as.integer( "${output_format_selection.sample_index}" ) -> sampleIndex
+as.logical( "${filter_bins}" ) -> filterBins
+
+    </configfile>
+  </configfiles>
+
+  <!-- ==================== -->
+  <!-- One text file as output -->
+  <!-- ==================== -->
+  <outputs>
+    <data format="tabular" name="output_file" label="QDNAseq: ${jobName} export file" />
+  </outputs>
+
+  <help>
+
+**Introduction**
+
+This tool is a wrapper for the "exportBins" function of the R Bioconductor package QDNAseq_
+
+.. _QDNAseq: http://www.bioconductor.org/packages/release/bioc/html/QDNAseq.html
+
+-----
+
+**What it does**
+
+**Input:** The input for this tool is a QDNAseq R object in RDS (R data structure) format, a (optional) output file of the QDNAseq galaxy tool. **Output:** Running this export tool provides you with one output text file. When either TSV or IGV is chosen as output format, the output file contains data of all samples present in the object. When BED is chosen as output format, output contains only one sample (by default the first). **OutputDataLevel:** The output data can be of three levels. If the object contains segmented and/or call values these can be chosen instead of the default copynumber (log2 transformed normalized read counts).
+
+-----
+
+**Output examples**
+
+*Example BED output:*
+
+::
+
+ track name="SAMPLE1.bam" description="copynumber"
+ 1  6000000  7000000  1:6000001-7000000  1.293  +
+ 1  7000000  8000000  1:7000001-8000000  1.335  +
+
+*Example TSV output:*
+
+::
+
+ feature            chr start    end      SAMPLE1.bam  SAMPLE2.bam
+ 1:6000001-7000000  1	6000001  7000000  1.293	       -0.979
+ 1:7000001-8000000  1	7000001  8000000  1.335        -1.022
+
+*Example IGV output (at segmented level):*
+
+::
+
+ #type=COPY_NUMBER
+ #track coords=1
+ chr  start    end      feature            SAMPLE1.bam  SAMPLE2.bam
+ 1    6000001  7000000  1:6000001-7000000  1.314        -1.0005
+ 1    7000001  8000000  1:7000001-8000000  1.314        -1.0005
+
+*Example IGV output (at called level):*
+
+::
+
+ #type=COPY_NUMBER
+ #track coords=1
+ chr  start    end      feature            SAMPLE1.bam  SAMPLE2.bam
+ 1    6000001  7000000  1:6000001-7000000  1            -1
+ 1    7000001  8000000  1:7000001-8000000  1            -1
+
+-----
+
+.. class:: warningmark
+
+As there is no R 3.1.0 galaxy-package yet (a requirement for QDNAseq) that works with all requirements, the **dependencies** need to be installed by hand and available to the user under which galaxy runs: R (>= 3.1.0) and bioconductor package QDNAseq (>= 1.2.2). In case the path to this R installation is not "R", also the wrapper xml must be updated to include the correct path during installation of this tool.
+
+-----
+
+**Citation**
+
+For the underlying QDNAseq R package please cite: 
+Scheinin I, Sie D, Bengtsson H, van de Wiel MA, Olshen AB, van Thuijl HF, van Essen HF, Eijk PP, Rustenburg F, Meijer GA, Reijneveld JC, Wesseling P, Pinkel D, Albertson DG and Ylstra B (2014). “DNA copy number analysis of fresh and formalin-fixed specimens by shallow whole-genome sequencing with identification and exclusion of problematic regions in the genome assembly.” Genome Research. doi:10.1101/gr.175141.114.
+
+See also the bioconductor package_ documentation.
+
+.. _package: http://www.bioconductor.org/packages/release/bioc/html/QDNAseq.html
+
+.. image:: LGG150_copynumber.png
+.. image:: LGG150_copynumberSegmented.png
+
+  </help>
+
+</tool>
