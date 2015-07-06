@@ -40,6 +40,8 @@
     <!-- Input RDS -->
     <!-- ==================== -->
     <param name="rds_file_path" type="data" optional="False" format="rds" label="Input RDS file" help="RDS file should contain a QDNAseq R object (output of QDNAseq tool)" />
+
+    <param name="av_error" size="10" type="float" value="0.00001" optional="False" label="Average Error" help="By default low so that most if not all possible breakpoints in the data are kept, output will then contain smaller regions." />
     
   </inputs>
 
@@ -54,6 +56,7 @@
 "${output_name}" -> outputName
 "${output_file}" -> outputFile
 "${rds_file_path}" -> rdsFilePath
+as.double( "${av_error}" ) -> avError
 
     </configfile>
   </configfiles>

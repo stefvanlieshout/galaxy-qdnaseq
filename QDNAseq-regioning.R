@@ -44,7 +44,7 @@ if ( length(sampleNames) < 2 ) stop( "Object contains too few samples, regioning
 
 ## analysis
 cgh <- makeCgh( qdnaseqObject, filter=TRUE )
-regions <- CGHregions( cgh )
+regions <- CGHregions( cgh, averror=0.00001 )
 outputData <- cbind( regions@featureData@data, regions@assayData$regions )
 
 ## output
